@@ -1,6 +1,8 @@
 # coding: utf-8
 
 import logging
+import warnings
+
 import yaml
 import os
 import string
@@ -10,28 +12,54 @@ import xlrd
 logging.basicConfig(level=logging.DEBUG)
 
 BLANK_LINES = 3
+EXCEL_XLS = 2003
+EXCEL_XLSX = 2007
+
+
+class UnknownFiletype(Exception):
+    pass
 
 
 class ExcelDriver(object):
-    def __init__(self):
+    def __init__(self, excel_file_name=""):
         self.excel_type = 0
+        self.file_name = excel_file_name
+        if excel_file_name.endswith('.xls'):
+            self.excel_type = EXCEL_XLS
+        elif excel_file_name.endswith('.xlsx'):
+            self.excel_type = EXCEL_XLSX
+        else:
+            warnings.warn("Unknown file type, {}".format(excel_file_name))
+            raise UnknownFiletype()
+        self.wb = None  # work book
+        self.ws = None  # work sheet
+        self.load_file(excel_file_name)
 
     def load_file(self, filename):
-        pass
+        if not filename:
+            logging.warning("Missing excel file name.")
+            return
+        if self.excel_type == EXCEL_XLSX:
+            self.wb = load_workbook(filename)
+            self.sheets = self.wb.sheetnames
+            self.ws = self.wb.active
+        elif self.excel_type == EXCEL_XLS:
+            self.wb = xlrd.open_workbook(filename)
 
     def change_sheet(self):
         pass
 
-    def get_cell_value(self):
-        pass
+    def get_cell_value(self, cell_pos):
+        if self.excel_type == EXCEL_XLSX:
+            return self.ws[cell_pos].value
+        elif self.excel_type == EXCEL_XLS:
+            return self.ws.cell_value(cell_pos)
 
 
 class ExcelBook(object):
     def __init__(self):
         self.parse_mode = 1
-        self.wb = None
-        self.sheets = []
-        self.ws = None
+        self.excel = None
         self.cols = []
         self.row_range = []
         self.headers = []
@@ -40,9 +68,8 @@ class ExcelBook(object):
         if not xlsx_file_name:
             logging.warning("Missing xlsx file name.")
             return
-        self.wb = load_workbook(xlsx_file_name)
-        self.sheets = self.wb.sheetnames
-        self.ws = self.wb.active
+        self.excel = ExcelDriver(xlsx_file_name)
+
         # Load desc yaml config
         if not yaml_config_file:
             yaml_filename = xlsx_file_name.split('.')[0] + '.yml'
@@ -58,10 +85,12 @@ class ExcelBook(object):
             headers = data.get('headers', {})
             skip_level = headers.get('skip_level', 0)
             skip_table_headers = headers.get('total_high', 1)
+
         # peek the rows and cols at the excel
         _, _, self.cols = self.get_cols_range(skip_level=skip_level)
         row_start, row_end, _ = self.get_rows_range(skip_table_headers=skip_table_headers)
         self.row_range = (row_start, row_end)
+
         # try to load headers
         self.headers = self.get_headers(headers_row=2)
 
@@ -77,7 +106,7 @@ class ExcelBook(object):
         blank_col_count = 0
         for alphabet in string.ascii_uppercase:
             cell_pos = '{}{}'.format(alphabet, 1+skip_level)
-            if self.ws[cell_pos].value:
+            if self.excel.get_cell_value(cell_pos):
                 blank_col_count = 0
                 col_array.append(alphabet)
                 col_end = alphabet
@@ -103,10 +132,10 @@ class ExcelBook(object):
         row_array = []
         blank_row_count = 0
         while 1:
-            pos_tag = '{}{}'.format(the_first_col, row_end)
-            if self.ws[pos_tag].value:
+            cell_pos = '{}{}'.format(the_first_col, row_end)
+            if self.excel.get_cell_value(cell_pos):
                 blank_row_count = 0
-                row_array.append(pos_tag)
+                row_array.append(cell_pos)
                 row_end += 1
                 continue
             # blank row, start counting
@@ -122,7 +151,7 @@ class ExcelBook(object):
         # _, _, col_range = self.get_cols_range()
         for col in self.cols:
             header_pos = "{}{}".format(col, headers_row)
-            cell_value = self.ws[header_pos].value
+            cell_value = self.excel.get_cell_value(header_pos)
             if not cell_value:
                 continue
             headers.append(cell_value)
@@ -136,7 +165,7 @@ class ExcelBook(object):
             single_data = {}
             for k in self.cols:
                 pos = "{}{}".format(k, i)
-                cell_value = self.ws[pos].value or ""
+                cell_value = self.excel.get_cell_value(pos) or ""
                 t_h = self.headers[self.cols.index(k)]
                 single_data[t_h] = cell_value
             data.append(single_data)
@@ -151,7 +180,8 @@ class SimpleExcelBook(ExcelBook):
 if __name__ == '__main__':
     book = SimpleExcelBook()
     # book.load('EnglishWordSmaple.xlsx')
-    book.load('sample2.xls')
+    # book.load('realworld.xlsx')
+    # book.load('sample2.xls')
     data = book.get_data()
     print(data)
 

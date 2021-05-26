@@ -77,8 +77,10 @@ class ExcelDriver(object):
             return self.ws[cell_pos].value
         elif self.excel_type == EXCEL_XLS:
             colx, rowx = self.cell_name_to_number(cell_pos)
-            print(rowx, colx)
-            return self.ws.cell_value(rowx, colx)
+            try:
+                return self.ws.cell_value(rowx, colx)
+            except IndexError:
+                return ''
 
 
 class ExcelBook(object):
@@ -94,7 +96,6 @@ class ExcelBook(object):
             logging.warning("Missing xlsx file name.")
             return
         self.excel = ExcelDriver(xlsx_file_name)
-        print(self.excel.get_cell_value('A0'))
 
         # Load desc yaml config
         if not yaml_config_file:
@@ -118,7 +119,8 @@ class ExcelBook(object):
         self.row_range = (row_start, row_end)
 
         # try to load headers
-        self.headers = self.get_headers(headers_row=2)
+        headers_row = skip_table_headers - 1 if self.excel.excel_type == EXCEL_XLS else skip_table_headers
+        self.headers = self.get_headers(headers_row=headers_row)
 
     def get_cols_range(self, skip_level=0):
         """

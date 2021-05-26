@@ -5,6 +5,7 @@ import warnings
 
 import yaml
 import os
+import re
 import string
 from openpyxl import Workbook, load_workbook
 import xlrd
@@ -21,6 +22,9 @@ class UnknownFiletype(Exception):
 
 
 class ExcelDriver(object):
+    """
+        抽象出Excel操作对象，兼容97/07版格式
+    """
     def __init__(self, excel_file_name=""):
         self.excel_type = 0
         self.file_name = excel_file_name
@@ -45,15 +49,36 @@ class ExcelDriver(object):
             self.ws = self.wb.active
         elif self.excel_type == EXCEL_XLS:
             self.wb = xlrd.open_workbook(filename)
+            self.ws = self.wb.sheet_by_index(0)  # 默认第一页sheet
+        return
 
-    def change_sheet(self):
-        pass
+    def change_sheet(self, sheet_index=0):
+        if self.excel_type == EXCEL_XLSX:
+            pass  # TODO: upgrade here, xlsx change sheet
+        elif self.excel_type == EXCEL_XLS:
+            self.ws = self.wb.sheet_by_index(sheet_index)
+
+    def cell_name_to_number(self, cell_name):
+        match = re.match(r"([a-z]+)([0-9]+)", cell_name, re.I)
+        if match:
+            colx, rowx = match.groups()
+            colx = ord(colx)
+            if colx <= 65:
+                colx = 0
+            else:
+                colx = colx - 65
+            rowx = int(rowx)
+            return colx, rowx
+        else:
+            return 0, 0
 
     def get_cell_value(self, cell_pos):
         if self.excel_type == EXCEL_XLSX:
             return self.ws[cell_pos].value
         elif self.excel_type == EXCEL_XLS:
-            return self.ws.cell_value(cell_pos)
+            colx, rowx = self.cell_name_to_number(cell_pos)
+            print(rowx, colx)
+            return self.ws.cell_value(rowx, colx)
 
 
 class ExcelBook(object):
@@ -69,6 +94,7 @@ class ExcelBook(object):
             logging.warning("Missing xlsx file name.")
             return
         self.excel = ExcelDriver(xlsx_file_name)
+        print(self.excel.get_cell_value('A0'))
 
         # Load desc yaml config
         if not yaml_config_file:
@@ -181,7 +207,7 @@ if __name__ == '__main__':
     book = SimpleExcelBook()
     # book.load('EnglishWordSmaple.xlsx')
     # book.load('realworld.xlsx')
-    # book.load('sample2.xls')
+    book.load('sample2.xls')
     data = book.get_data()
     print(data)
 

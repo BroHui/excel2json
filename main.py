@@ -54,7 +54,8 @@ class ExcelDriver(object):
 
     def change_sheet(self, sheet_index=0):
         if self.excel_type == EXCEL_XLSX:
-            pass  # TODO: upgrade here, xlsx change sheet
+            self.wb.active = sheet_index
+            self.ws = self.wb.active
         elif self.excel_type == EXCEL_XLS:
             self.ws = self.wb.sheet_by_index(sheet_index)
 

@@ -16,6 +16,9 @@ BLANK_LINES = 3
 EXCEL_XLS = 2003
 EXCEL_XLSX = 2007
 
+TABLE_STATIC = 1
+TABLE_FLOATING = 2
+
 
 class UnknownFiletype(Exception):
     pass
@@ -73,6 +76,25 @@ class ExcelDriver(object):
         else:
             return 0, 0
 
+    def get_shift_cell_name(self, std_cell, shift_list):
+        if not shift_list or len(shift_list) != 4:
+            return std_cell
+        cell_colx, cell_rowx = self.cell_name_to_number(std_cell)
+        if shift_list[0]:  # 上偏移
+            cell_colx -= shift_list[0]
+        elif shift_list[1]:  # 下偏移
+            cell_colx += shift_list[1]
+        elif shift_list[2]:  # 左偏移
+            cell_rowx -= shift_list[2]
+        elif shift_list[3]:  # 右偏移
+            cell_rowx += shift_list[3]
+        if self.excel_type == EXCEL_XLS:
+            return xlrd.cellname(cell_rowx, cell_colx)
+        elif self.excel_type == EXCEL_XLSX:
+            cell_name = "{}{}".format(chr(cell_colx+65), cell_rowx)
+            print(cell_colx, cell_rowx, cell_name)
+            return cell_name
+
     def get_cell_value(self, cell_pos):
         if self.excel_type == EXCEL_XLSX:
             return self.ws[cell_pos].value
@@ -91,6 +113,9 @@ class ExcelBook(object):
         self.cols = []
         self.row_range = []
         self.headers = []
+        self.table_type = TABLE_STATIC
+        self.pick_list = {}
+        self.desc_shift = []
 
     def load(self, xlsx_file_name="", yaml_config_file=""):
         if not xlsx_file_name:
@@ -110,18 +135,28 @@ class ExcelBook(object):
             with open(yaml_filename, encoding='UTF-8') as fp:
                 data = yaml.load(fp, yaml.FullLoader)
                 logging.debug("the YAML config is {}".format(data))
-            headers = data.get('headers', {})
-            skip_level = headers.get('skip_level', 0)
-            skip_table_headers = headers.get('total_high', 1)
+            if 'static' in data.keys():
+                headers = data.get('headers', {})
+                skip_level = headers.get('skip_level', 0)
+                skip_table_headers = headers.get('total_high', 1)
+                self.table_type = TABLE_STATIC
+            elif 'floating' in data.keys():
+                self.table_type = TABLE_FLOATING
 
-        # peek the rows and cols at the excel
-        _, _, self.cols = self.get_cols_range(skip_level=skip_level)
-        row_start, row_end, _ = self.get_rows_range(skip_table_headers=skip_table_headers)
-        self.row_range = (row_start, row_end)
+        if self.table_type == TABLE_STATIC:
+            # peek the rows and cols at the excel
+            _, _, self.cols = self.get_cols_range(skip_level=skip_level)
+            row_start, row_end, _ = self.get_rows_range(skip_table_headers=skip_table_headers)
+            self.row_range = (row_start, row_end)
 
-        # try to load headers
-        headers_row = skip_table_headers - 1 if self.excel.excel_type == EXCEL_XLS else skip_table_headers
-        self.headers = self.get_headers(headers_row=headers_row)
+            # try to load headers
+            headers_row = skip_table_headers - 1 if self.excel.excel_type == EXCEL_XLS else skip_table_headers
+            self.headers = self.get_headers(headers_row=headers_row)
+        elif self.table_type == TABLE_FLOATING:
+            floating_conf = data['floating']
+            self.pick_list = floating_conf['values']
+            if 'desc_shift' in floating_conf:
+                self.desc_shift = floating_conf['desc_shift']
 
     def get_cols_range(self, skip_level=0):
         """
@@ -189,15 +224,30 @@ class ExcelBook(object):
 
     def get_data(self):
         data = []
-        row_start, row_end = self.row_range
-        for i in range(row_start, row_end+1):
-            single_data = {}
-            for k in self.cols:
-                pos = "{}{}".format(k, i)
-                cell_value = self.excel.get_cell_value(pos) or ""
-                t_h = self.headers[self.cols.index(k)]
-                single_data[t_h] = cell_value
-            data.append(single_data)
+        if self.table_type == TABLE_STATIC:
+            row_start, row_end = self.row_range
+            for i in range(row_start, row_end+1):
+                single_data = {}
+                for k in self.cols:
+                    pos = "{}{}".format(k, i)
+                    cell_value = self.excel.get_cell_value(pos) or ""
+                    t_h = self.headers[self.cols.index(k)]
+                    single_data[t_h] = cell_value
+                data.append(single_data)
+        elif self.table_type == TABLE_FLOATING:
+            for pick_cell in self.pick_list:
+                cell_key = self.pick_list[pick_cell]
+                cell_value = self.excel.get_cell_value(pick_cell) or ""
+                single_data = {
+                    'key': cell_key,
+                    'value': cell_value
+                }
+                # 如果有注释
+                if self.desc_shift:
+                    desc_cell = self.excel.get_shift_cell_name(pick_cell, self.desc_shift)
+                    desc_value = self.excel.get_cell_value(desc_cell) or ""
+                    single_data['desc'] = desc_value
+                data.append(single_data)
         return data
 
 
@@ -208,9 +258,10 @@ class SimpleExcelBook(ExcelBook):
 
 if __name__ == '__main__':
     book = SimpleExcelBook()
-    # book.load('EnglishWordSmaple.xlsx')
-    # book.load('realworld.xlsx')
-    book.load('sample2.xls')
+    # book.load('demo1.xlsx')
+    # book.load('demo2.xlsx')
+    book.load('demo3.xlsx')
+    # book.load('sample2.xls')
     data = book.get_data()
     print(data)
 

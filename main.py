@@ -116,7 +116,18 @@ class ExcelBook(object):
         self.pick_list = {}
         self.desc_shift = []
 
-    def load(self, xlsx_file_name="", yaml_config_file=""):
+    def load_yaml(self, yaml_filename=""):
+        if not yaml_filename:
+            return {}
+        data = {}
+        if os.path.exists(yaml_filename):
+            logging.info("find {}, read config".format(yaml_filename))
+            with open(yaml_filename, encoding='UTF-8') as fp:
+                data = yaml.load(fp, yaml.FullLoader)
+                logging.debug("the YAML config is {}".format(data))
+        return data
+
+    def load(self, xlsx_file_name="", yaml_config_file="", yaml_config={}):
         if not xlsx_file_name:
             logging.warning("Missing xlsx file name.")
             return
@@ -128,19 +139,19 @@ class ExcelBook(object):
         else:
             yaml_filename = yaml_config_file
         skip_level, skip_table_headers = 0, 1
-        if os.path.exists(yaml_filename):
-            logging.info("find {}, read config".format(yaml_filename))
-            data = {}
-            with open(yaml_filename, encoding='UTF-8') as fp:
-                data = yaml.load(fp, yaml.FullLoader)
-                logging.debug("the YAML config is {}".format(data))
-            if 'static' in data.keys():
-                headers = data.get('static', {}).get('headers', {})
-                skip_level = headers.get('skip_level', 0)
-                skip_table_headers = headers.get('total_high', 1)
-                self.table_type = TABLE_STATIC
-            elif 'floating' in data.keys():
-                self.table_type = TABLE_FLOATING
+        if yaml_config:
+            data = yaml_config
+            logging.info("Using yaml_config instead. {}".format(yaml_config))
+        else:
+            data = self.load_yaml(yaml_filename)
+        logging.debug(data)
+        if 'static' in data.keys():
+            headers = data.get('static', {}).get('headers', {})
+            skip_level = headers.get('skip_level', 0)
+            skip_table_headers = headers.get('total_high', 1)
+            self.table_type = TABLE_STATIC
+        elif 'floating' in data.keys():
+            self.table_type = TABLE_FLOATING
 
         if self.table_type == TABLE_STATIC:
             # peek the rows and cols at the excel
@@ -261,7 +272,7 @@ class SimpleExcelBook(ExcelBook):
 if __name__ == '__main__':
     book = SimpleExcelBook()
     # book.load('demo1.xlsx')
-    book.load('demo2.xlsx')
+    book.load('demo2.xlsx', yaml_config={'static': {'headers': {'skip_level': 1, 'total_high': 2}}})
     # book.load('demo3.xlsx')
     # book.load('sample2.xls')
     data = book.get_data()

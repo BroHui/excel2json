@@ -1,0 +1,10 @@
+floating:
+  values:
+    'B3': 'valuea'
+    'G3': 'valueb'
+    'E6': 'valuec'
+  desc_shift:
+    - 0
+    - 0
+    - 0
+    - 1

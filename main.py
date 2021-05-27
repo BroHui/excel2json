@@ -7,7 +7,7 @@ import yaml
 import os
 import re
 import string
-from openpyxl import Workbook, load_workbook
+from openpyxl import load_workbook
 import xlrd
 
 logging.basicConfig(level=logging.DEBUG)
@@ -92,7 +92,6 @@ class ExcelDriver(object):
             return xlrd.cellname(cell_rowx, cell_colx)
         elif self.excel_type == EXCEL_XLSX:
             cell_name = "{}{}".format(chr(cell_colx+65), cell_rowx)
-            print(cell_colx, cell_rowx, cell_name)
             return cell_name
 
     def get_cell_value(self, cell_pos):
@@ -136,7 +135,7 @@ class ExcelBook(object):
                 data = yaml.load(fp, yaml.FullLoader)
                 logging.debug("the YAML config is {}".format(data))
             if 'static' in data.keys():
-                headers = data.get('headers', {})
+                headers = data.get('static', {}).get('headers', {})
                 skip_level = headers.get('skip_level', 0)
                 skip_table_headers = headers.get('total_high', 1)
                 self.table_type = TABLE_STATIC
@@ -223,6 +222,9 @@ class ExcelBook(object):
         return headers
 
     def get_data(self):
+        if not self.excel:
+            logging.error("Excel file object not init.")
+            return
         data = []
         if self.table_type == TABLE_STATIC:
             row_start, row_end = self.row_range
@@ -259,8 +261,8 @@ class SimpleExcelBook(ExcelBook):
 if __name__ == '__main__':
     book = SimpleExcelBook()
     # book.load('demo1.xlsx')
-    # book.load('demo2.xlsx')
-    book.load('demo3.xlsx')
+    book.load('demo2.xlsx')
+    # book.load('demo3.xlsx')
     # book.load('sample2.xls')
     data = book.get_data()
     print(data)

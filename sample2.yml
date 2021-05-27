@@ -1,3 +1,4 @@
-headers:
-  skip_level: 0
-  total_high: 1
+static:
+  headers:
+    skip_level: 0
+    total_high: 1

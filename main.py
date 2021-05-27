@@ -81,13 +81,13 @@ class ExcelDriver(object):
             return std_cell
         cell_colx, cell_rowx = self.cell_name_to_number(std_cell)
         if shift_list[0]:  # 上偏移
-            cell_colx -= shift_list[0]
+            cell_rowx -= shift_list[0]
         elif shift_list[1]:  # 下偏移
-            cell_colx += shift_list[1]
+            cell_rowx += shift_list[1]
         elif shift_list[2]:  # 左偏移
-            cell_rowx -= shift_list[2]
+            cell_colx -= shift_list[2]
         elif shift_list[3]:  # 右偏移
-            cell_rowx += shift_list[3]
+            cell_colx += shift_list[3]
         if self.excel_type == EXCEL_XLS:
             return xlrd.cellname(cell_rowx, cell_colx)
         elif self.excel_type == EXCEL_XLSX:

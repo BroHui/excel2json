@@ -127,7 +127,9 @@ class ExcelBook(object):
                 logging.debug("the YAML config is {}".format(data))
         return data
 
-    def load(self, xlsx_file_name="", yaml_config_file="", yaml_config={}):
+    def load(self, xlsx_file_name="", yaml_config_file="", yaml_config=None):
+        if yaml_config is None:
+            yaml_config = {}
         if not xlsx_file_name:
             logging.warning("Missing xlsx file name.")
             return
@@ -220,7 +222,9 @@ class ExcelBook(object):
         logging.debug("row start {}, row end {}".format(row_start, row_end))
         return row_start, row_end, row_array
 
-    def get_headers(self, headers_row=1, headers_blocks=[]):
+    def get_headers(self, headers_row=1, headers_blocks=None):
+        if headers_blocks is None:
+            headers_blocks = []
         headers = []
         # _, _, col_range = self.get_cols_range()
         for col in self.cols:
@@ -277,4 +281,3 @@ if __name__ == '__main__':
     # book.load('sample2.xls')
     data = book.get_data()
     print(data)
-

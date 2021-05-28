@@ -28,7 +28,7 @@ class ExcelDriver(object):
     """
         抽象出Excel操作对象，兼容97/07版格式
     """
-    def __init__(self, excel_file_name=""):
+    def __init__(self, excel_file_name="", file_like_object=None):
         self.excel_type = 0
         self.file_name = excel_file_name
         if excel_file_name.endswith('.xls'):
@@ -40,7 +40,12 @@ class ExcelDriver(object):
             raise UnknownFiletype()
         self.wb = None  # work book
         self.ws = None  # work sheet
-        self.load_file(excel_file_name)
+        if file_like_object:
+            target_file = file_like_object
+            logging.info("Use file like object instead. {}".format(file_like_object))
+        else:
+            target_file = excel_file_name
+        self.load_file(target_file)
 
     def load_file(self, filename):
         if not filename:
@@ -127,13 +132,13 @@ class ExcelBook(object):
                 logging.debug("the YAML config is {}".format(data))
         return data
 
-    def load(self, xlsx_file_name="", yaml_config_file="", yaml_config=None):
+    def load(self, xlsx_file_name="", yaml_config_file="", yaml_config=None, file_like_object=None):
         if yaml_config is None:
             yaml_config = {}
         if not xlsx_file_name:
             logging.warning("Missing xlsx file name.")
             return
-        self.excel = ExcelDriver(xlsx_file_name)
+        self.excel = ExcelDriver(xlsx_file_name, file_like_object)
 
         # Load desc yaml config
         if not yaml_config_file:
@@ -276,7 +281,8 @@ class SimpleExcelBook(ExcelBook):
 if __name__ == '__main__':
     book = SimpleExcelBook()
     # book.load('demo1.xlsx')
-    book.load('demo2.xlsx', yaml_config={'static': {'headers': {'skip_level': 1, 'total_high': 2}}})
+    fobj = open('demo2.xlsx', 'rb')
+    book.load('demo2.xlsx', yaml_config={'static': {'headers': {'skip_level': 1, 'total_high': 2}}}, file_like_object=fobj)
     # book.load('demo3.xlsx')
     # book.load('sample2.xls')
     data = book.get_data()
